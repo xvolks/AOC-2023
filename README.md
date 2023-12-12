@@ -3,6 +3,8 @@
 This repository is here for myself, 
 my daughter who needs to learn Python but hates CS.
 
+Most of the code is written in Python 3.8+ but some parts require 3.11.
+
 My goal is to write "clean code" with documentation.
 This goal will not be reached, but who cares?
 
