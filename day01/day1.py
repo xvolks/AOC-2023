@@ -1,3 +1,7 @@
+"""
+Get story at : https://adventofcode.com/2023/day/1
+"""
+
 from enum import Enum
 from pathlib import Path
 from typing import List, Tuple
