@@ -54,39 +54,49 @@ a more efficient solution.
 
 
 def cut_range(seed_range: Tuple[int, int], wf: Workflow, name: str = None):
-    seed_range = range(seed_range[0], seed_range[0] + seed_range[1] - 1)
+    seed_range = range(seed_range[0], seed_range[0] + seed_range[1])
     for m in wf.maps:
         if name is not None and m.name != name:
             continue
         for r in m.ranges:
-            current_range = range(r.src_start, r.src_start + r.length - 1)
+            current_range = range(r.src_start, r.src_start + r.length)
             intersection = range(max(seed_range.start, current_range.start), min(seed_range.stop, current_range.stop))
             if len(intersection) > 0:
                 # print(f"Found intersection {current_range} and {seed_range}, intersection is {intersection}")
+                intersection_len = intersection.stop - intersection.start
+                trailing_len = seed_range.stop - intersection.stop
+                heading_len = intersection.start - seed_range.start
                 if intersection.start == seed_range.start:
-                    return (
-                        (intersection.start, intersection.stop - intersection.start),
-                        (intersection.stop, seed_range.stop - intersection.stop)
-                    )
+                    if trailing_len > 0:
+                        return (
+                            (intersection.start, intersection_len),
+                            (intersection.stop, trailing_len)
+                        )
+                    else:
+                        return (intersection.start, intersection_len),
+
                 elif intersection.stop == seed_range.stop:
-                    return (
-                        (seed_range.start, intersection.start - seed_range.start),
-                        (intersection.start, intersection.stop - intersection.start),
-                    )
+                    if heading_len > 0:
+                        return (
+                            (seed_range.start, heading_len),
+                            (intersection.start, intersection_len),
+                        )
+                    else:
+                        return (intersection.start, intersection_len),
                 else:
                     return (
-                        (seed_range.start, intersection.start - seed_range.start),
-                        (intersection.start, intersection.stop - intersection.start),
-                        (intersection.stop, seed_range.stop - intersection.stop),
+                        (seed_range.start, heading_len),
+                        (intersection.start, intersection_len),
+                        (intersection.stop, trailing_len),
                     )
     return (seed_range.start, seed_range.stop - seed_range.start),
 
 
 def fine_cut_range(seed_range: Tuple[int, int], wf: Workflow):
     length = seed_range[1]
-    seed_range_r = range(seed_range[0], seed_range[0] + length - 1)
+    seed_range_r = range(seed_range[0], seed_range[0] + length)
     first = seed_range_r.start
-    last = seed_range_r.stop
+    last = seed_range_r.stop - 1
 
     for m in wf.maps:
         first_soil = m.get_destination(first)
@@ -99,7 +109,7 @@ def fine_cut_range(seed_range: Tuple[int, int], wf: Workflow):
         else:
             # Need to cut here
             # print(f"{m.name}: {last_soil} - {first_soil} = {last_soil - first_soil} vs. {length}")
-            new_ranges_of_layer_m = cut_range((first, last - first), wf, m.name)
+            new_ranges_of_layer_m = cut_range((first, length), wf, m.name)
             # Here we need to go back to the parent seeds
             # The start of the first range is the first seed
             # The end of the last range is the last seed
@@ -116,11 +126,13 @@ def fine_cut_range(seed_range: Tuple[int, int], wf: Workflow):
                 last_whatever_first_range = src
             assert last_whatever_first_range in seed_range_r, (f"The calculated last seed {last_whatever_first_range} "
                                                                f"is not in seed range {seed_range_r}")
-            first_sub_range_len = last_whatever_first_range - seed_range[0] + 1
+            first_sub_range_len = last_whatever_first_range - seed_range[0]
+            secnd_sub_range_len = seed_range[1] - first_sub_range_len
             # Tracking the off-by-one problem
-            if first_sub_range_len == 1:
+            if first_sub_range_len == 2 or secnd_sub_range_len == 2:
                 print(f"Range of one {seed_range[0]}, {first_sub_range_len}")
-            return (seed_range[0], first_sub_range_len), (last_whatever_first_range + 1, seed_range[1] - first_sub_range_len)
+
+            return (seed_range[0], first_sub_range_len), (last_whatever_first_range, secnd_sub_range_len)
 
 
 def recursive_cut_seed_range(seed_range: Tuple[int, int], wf: Workflow) -> List[Tuple[int, int]]:
@@ -156,6 +168,14 @@ def track_off_by_one(wf: Workflow, seed_to_check: int):
             if delta == 1:
                 print("Off-by-one!")
         prev = d
+
+
+def reproduce_off_by_one(wf: Workflow, s_range: Tuple[int, int]):
+    """This function is used to reproduce the off-by-one problem"""
+    all_ranges = recursive_cut_seed_range(s_range, wf)
+    for i, r in enumerate(all_ranges):
+        print(f"New range #{i} : {r}")
+        track_off_by_one(wf, r[0])
     exit(0)
 
 
@@ -164,25 +184,31 @@ def better_part2(input_: str):
     part_iter = seeds.part2_iter()
     # print(part_iter)
     wf = NaiveWorkflow(maps)
-
-    # track_off_by_one(wf, 3435584797)
+    import time
+    start = time.time()
+    # reproduce_off_by_one(wf, (1808166864, 294882110))
+    # track_off_by_one(wf, 1866167533)
     # print(is_seed_range_behave_as_single_seed(seeds.part2_iter()[0], wf))
     # can_we_squeeze_maps(seeds.part2_iter()[0], wf)
     sub_ranges = []
     for i, seed_range in enumerate(part_iter):
         sub_ranges.extend(recursive_cut_seed_range(seed_range, wf))
-        print(f"Loop #{i}: {sub_ranges}")
-    print(len(sub_ranges))
-    min_loc = 1e38
+        # print(f"Loop #{i}: {sub_ranges}")
+    min_loc = 9999999999
     for sr in sub_ranges:
+        # Here we just need to test the first seed since they are all projected in the same space and are just
+        # incremented, so the first seed is also the minimum of the range.
         loc = wf.walk(sr[0])
         if loc < min_loc:
             min_loc = loc
-    print(f"Solution of part #2: {min_loc} (minimum location)")
+
+    end = time.time()
+    print(f"Found {len(sub_ranges)} sub ranges of seeds")
+    print(f"Solution of part #2: {min_loc} (minimum location) in {end - start:.4f} seconds")
+
+    assert 59370572 == min_loc, f"My Solution is 59370572, yours is {min_loc}"
 
 
 if __name__ == '__main__':
-    import sys
-    sys.setrecursionlimit(45000)
     sample = Path("part1.txt").read_text()
     better_part2(sample)
