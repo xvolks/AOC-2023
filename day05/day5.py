@@ -1,7 +1,11 @@
+"""
+Get story at : https://adventofcode.com/2023/day/5
+"""
+
 import abc
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Tuple, Type
+from typing import List, Tuple, Type, Self, Optional
 
 from tqdm import tqdm
 
@@ -53,16 +57,19 @@ class Map:
     ranges: List[Range]
 
     @classmethod
-    def from_lines(cls, map_name: str, lines: List[str]) -> "Map":
+    def from_lines(cls, map_name: str, lines: List[str]) -> Self:
         ranges = []
         for line in lines:
             dst_start, src_start, length = map(int, line.split())
             ranges.append(Range(dst_start, src_start, length))
         return cls(map_name, ranges)
 
-    def get_destination(self, src: int) -> int:
-        for r in self.ranges:
+    def get_destination(self, src: int, trace: Optional[List] = None) -> int:
+        for i, r in enumerate(self.ranges):
             if r.src_start <= src < r.src_start + r.length:
+                if trace is not None:
+                    trace.append((self.name, src, i, r))
+                    print(f"{self.name} {src=} took road #{i} --> {r}")
                 return r.dst_start + src - r.src_start
         return src
 
@@ -78,9 +85,9 @@ class Seeds:
     seeds: List[int]
 
     @classmethod
-    def from_line(cls, line: str) -> "Seeds":
+    def from_line(cls, line: str) -> Self:
         seeds, data = line.split(":")
-        return cls(list(map(lambda x: int(x.strip()) , data.strip().split())))
+        return cls(list(map(lambda x: int(x.strip()), data.strip().split())))
 
     def part2_iter(self) -> List[Tuple[int, int]]:
         ranges = []
@@ -99,7 +106,7 @@ class Workflow:
     maps: List[Map]
 
     @abc.abstractmethod
-    def walk(self, seed: int) -> int:
+    def walk(self, seed: int, trace: Optional[List] = None) -> int:
         ...
 
     @abc.abstractmethod
@@ -129,11 +136,12 @@ class NaiveWorkflow(Workflow):
                 s = self.walk(seed)
                 if s < m:
                     m = s
+        return m
 
-    def walk(self, seed: int) -> int:
+    def walk(self, seed: int, trace: Optional[List] = None) -> int:
         s = seed
         for mp in self.maps:
-            d = mp.get_destination(s)
+            d = mp.get_destination(s, trace=trace)
             s = d
         return s
 
@@ -170,6 +178,7 @@ def parse_input(text: str) -> Tuple[Seeds, List[Map]]:
     map_name = None
     values = []
     result = []
+    seeds = None
     for line in lines:
         if not line.strip():
             continue
@@ -187,11 +196,13 @@ def parse_input(text: str) -> Tuple[Seeds, List[Map]]:
             values.append(line)
     if map_name:
         result.append(Map.from_lines(map_name, values))
+    if seeds is None:
+        raise ValueError("Seeds not found? Check your input")
     return seeds, result
 
 
 def part1(wfc: Type[Workflow]):
-    # sample = Path("part1.txt").read_text()
+    sample = Path("part1.txt").read_text()
     seeds, maps = parse_input(sample)
     wf = wfc(maps)
     m = wf.solve_part1(seeds)
