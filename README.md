@@ -21,4 +21,7 @@ Lets dive in with [day 1](day01/day1.py)
 My maze of day 10, the start point is red dot near the center
 the red part is the connected pipe network. In white the random 
 pipes used for padding.
+
 ![maze](day10/maze.jpeg)
+
+<iframe width="640" height="360" frameborder="0" src="https://mega.nz/embed/8Y9xCZyQ#F4u1G2nY3vY8EIpHqrVZEo-H_P2NwPp8CUMcQmNzu8M" allowfullscreen ></iframe>
