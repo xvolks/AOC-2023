@@ -1,3 +1,6 @@
+"""
+Get the story at https://adventofcode.com/2023/day/10
+"""
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -132,8 +135,9 @@ class Maze:
     pipes: List[Pipe]
     height: int
     width: int
+    _pipes_cache: List[List[Optional[Pipe]]] = None
 
-    def draw(self):
+    def draw(self) -> np.ndarray:
         scale = 3
         image = np.zeros((self.height * scale, self.width * scale), dtype=np.uint8)
         entry = None
@@ -155,6 +159,7 @@ class Maze:
         cv2.imshow('image', image)
         cv2.imwrite('maze.jpeg', image)
         cv2.waitKey(0)
+        return image
 
     def count_steps(self) -> int:
         """
@@ -165,6 +170,8 @@ class Maze:
         Move to that neighbor and repeat
         :return: the number of steps to get back to the starting point
         """
+        if self._pipes_cache is None:
+            self._pipes_cache = [[None for _ in range(self.height)] for _ in range(self.width)]
         starting_point = next(filter(lambda p: p.pipe_type == PipeType.START, self.pipes))
 
         # this is the first step
@@ -220,16 +227,23 @@ class Maze:
             y -= 1
         else:
             raise ValueError(f'Invalid direction: {direction}')
-        return next(filter(lambda p: p.x == x and p.y == y, self.pipes))
+        return self.get_pipe_at(x, y)
+
+    def get_pipe_at(self, x: int, y: int) -> Pipe:
+        _cache = self._pipes_cache[x][y]
+        if _cache is None:
+            _cache = next(filter(lambda p: p.x == x and p.y == y, self.pipes))
+            self._pipes_cache[x][y] = _cache
+        return _cache
 
     def get_next_pipe(self, starting_point: Pipe) -> Pipe:
-        left = next(filter(lambda p: p.x == starting_point.x - 1 and p.y == starting_point.y, self.pipes))
+        left = self.get_pipe_at(starting_point.x - 1, starting_point.y)
         if left.visited or not left.can_go(Direction.RIGHT):
-            right = next(filter(lambda p: p.x == starting_point.x + 1 and p.y == starting_point.y, self.pipes))
+            right = self.get_pipe_at(starting_point.x + 1, starting_point.y)
             if right.visited or not right.can_go(Direction.LEFT):
-                up = next(filter(lambda p: p.x == starting_point.x and p.y == starting_point.y - 1, self.pipes))
+                up = self.get_pipe_at(starting_point.x, starting_point.y - 1)
                 if up.visited or not up.can_go(Direction.DOWN):
-                    down = next(filter(lambda p: p.x == starting_point.x and p.y == starting_point.y + 1, self.pipes))
+                    down = self.get_pipe_at(starting_point.x, starting_point.y + 1)
                     if down.visited:
                         raise ValueError('Already visited')
                     next_point = down
